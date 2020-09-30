@@ -93,9 +93,6 @@ max-width:70em;
 	</div>
 <?php
 
-include("../torr/downloadCache.php");
-$apiurl = 'https://movies-v2.api-fetch.sh/';
-
 if(isset($imdb_id)){
 	$details = json_decode(GetPage($apiurl.substr($type_val, 0, -1).'/'.$imdb_id, false, false, 'json', false, true), true);
 ?>
