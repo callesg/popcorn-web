@@ -1,31 +1,45 @@
 <?php
-$api_config = json_decode(file_get_contents('api-info.json'), true);
+//include download library
+include("downloadCache.php");
 
+//Load information about the API
+$api_config = json_decode(file_get_contents('api-info.json'), true);
+$apiurl = 'https://movies-v2.api-fetch.sh/';
+
+//Clean the input so it can be printed
 foreach($_GET AS $k => $v){
 	$_GET[$k] = htmlspecialchars($v);
 }
 
+//if we have not selected a media type we pic one from the api
 if(!isset($_GET['type'])){
 	$_GET['type'] = key($api_config);
 }
 $type_val = $_GET['type'];
+
+//Only media types from the API config is allowed
 if(!isset($api_config[$type_val])){
 	echo "non valid type";
 	exit;
 }
 $type = $api_config[$type_val];
 
+//Set a default genere
 if(!isset($_GET['genre'])){
 	$_GET['genre'] = current($type['genres']);
 }
+//Set default sorting field
 if(!isset($_GET['sort'])){
 	$_GET['sort'] = current($type['sorts']);
 }
+
+//Are we searching for something
 $keywords = '';
 if(isset($_GET['keywords'])){
 	$keywords = $_GET['keywords'];
 }
 
+//are we trying to view a particular piece of media
 $imdb_id = NULL;
 if(isset($_GET['imdb_id'])){
 	$imdb_id = $_GET['imdb_id'];
@@ -55,32 +69,31 @@ max-width:70em;
 }
 </style>
 <body>
-<div>
+	<div>
 <?php foreach($api_config AS $k => $tp){ ?>
-<a href="?type=<?= $k ?>"><?= $k ?></a>
+		<a href="?type=<?= $k ?>"><?= $k ?></a>
 <?php } ?>
-<form method="get" class="filter">
-<input type="hidden" name="type" value="<?= $type_val ?>">
-<select name="genre" onchange="this.form.submit()">
+		<form method="get" class="filter">
+			<input type="hidden" name="type" value="<?= $type_val ?>">
+			<select name="genre" onchange="this.form.submit()">
 <?php foreach($type['genres'] AS $genre){ ?>
-<option <?= ($genre == $_GET['genre'])?'selected':'' ?> value="<?= $genre ?>"><?= $genre ?></option>
+				<option <?= ($genre == $_GET['genre'])?'selected':'' ?> value="<?= $genre ?>"><?= $genre ?></option>
 <?php } ?>
-</select>
-<select name="sort" onchange="this.form.submit()">
+			</select>
+			<select name="sort" onchange="this.form.submit()">
 <?php foreach($type['sorts'] AS $sort){ ?>
-<option <?= ($sort == $_GET['sort'])?'selected':'' ?> value="<?= $sort ?>"><?= $sort ?></option>
+				<option <?= ($sort == $_GET['sort'])?'selected':'' ?> value="<?= $sort ?>"><?= $sort ?></option>
 <?php } ?>
-</select>
-</form>
-<form method="get" class="filter">
-<input type="hidden" name="type" value="<?= $type_val ?>">
-<input type="text" name="keywords" value="<?= $keywords ?>">
-</form>
-</div>
+			</select>
+		</form>
+		<form method="get" class="filter">
+			<input type="hidden" name="type" value="<?= $type_val ?>">
+			<input type="text" name="keywords" value="<?= $keywords ?>">
+		</form>
+	</div>
 <?php
 
 include("../torr/downloadCache.php");
-
 $apiurl = 'https://movies-v2.api-fetch.sh/';
 
 if(isset($imdb_id)){
@@ -111,10 +124,7 @@ if(isset($imdb_id)){
 	<div>
 		<h5>Season <?= $season ?></h5>
 		<table>
-<?php foreach($episodes AS $episode){
-	//$tors = array();
-	//$episode['torrents']
-?>
+<?php foreach($episodes AS $episode){?>
 		<tr>
 			<td><?= $episode['episode'] ?></td>
 			<td><?= $episode['title'] ?></td>
@@ -150,7 +160,6 @@ foreach($details['torrents']['en'] AS $tid => $tor){
 }else{ //browsing
 	$page = GetPage($apiurl.$type_val, false, false, 'json', false, true);
 	$filmpages = json_decode($page, true);
-	//var_dump($filmpages);
 	foreach($filmpages AS $id => $endpoint){
 		if($id > 2){
 			break;
@@ -164,21 +173,19 @@ foreach($details['torrents']['en'] AS $tid => $tor){
 		foreach($movies AS $movie){
 ?>
 <div style="float:left;width:12em;height:24em;">
-<!--<p><?= $movie["synopsis"] ?></p>-->
-<a href="?type=<?= $type_val ?>&imdb_id=<?= $movie["imdb_id"] ?>">
-	<img height="190" src="<?= $movie["images"]["poster"] ?>">
-	<h4><?= $movie["title"] ?></h4>
-	<h6 style="color:rgb(70,70,70);"><?= $movie["year"] ?></h6>
-</a>
+	<!--<p><?= $movie["synopsis"] ?></p>-->
+	<a href="?type=<?= $type_val ?>&imdb_id=<?= $movie["imdb_id"] ?>">
+		<img height="190" src="<?= $movie["images"]["poster"] ?>">
+		<h4><?= $movie["title"] ?></h4>
+		<h6 style="color:rgb(70,70,70);"><?= $movie["year"] ?></h6>
+	</a>
 <?php foreach($movie['torrents']['en'] AS $res => $tor){ ?>
-<p><a href="/torr/get.php?link=<?= urlencode($tor['url']) ?>"><?= $res ?></a></p>
+	<p><a href="/torr/get.php?link=<?= urlencode($tor['url']) ?>"><?= $res ?></a></p>
 <?php } ?>
 </div>
 <?php
 
 		}
-	//var_dump($movies);
-	
 	}
 }
 ?>
