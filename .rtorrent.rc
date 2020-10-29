@@ -1,4 +1,4 @@
-method.set_key = event.download.finished,move_complete,"d.set_directory=/media/downloaded_folder/;execute=/opt/torrent_done.sh,$d.get_base_path="
+method.set_key = event.download.finished,move_complete,"d.directory.set=/media/downloaded_folder/;execute=/opt/torrent_done.sh,$d.get_base_path="
 
 directory = /media/downloading_folder
 
