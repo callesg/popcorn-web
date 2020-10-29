@@ -11,7 +11,7 @@ popcorn-web connects to the popcorntime API to list media, uses rtorrent to down
 * You can move the download folders, just make sure you update config.json accordingly
 
 ```bash
-echo install depencies
+echo install dependencies
 sudo apt-get -y install apache2 php libapache2-mod-php php-curl git rtorrent tmux ffmpeg
 
 echo download popcorn-web to public web folder
