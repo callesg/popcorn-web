@@ -3,3 +3,5 @@ method.set_key = event.download.finished,move_complete,"d.set_directory=/media/d
 directory = /media/downloading_folder
 
 schedule = watch_directory,5,5,load.start=/media/torrent_folder/*.torrent
+
+session = /tmp/rtorrentsession
