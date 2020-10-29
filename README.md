@@ -12,7 +12,7 @@ popcorn-web connects to the popcorntime API to list media, uses rtorrent to down
 
 ```bash
 echo install depencies
-sudo apt-get install apache2 php libapache2-mod-php php-curl git rtorrent tmux ffmpeg
+sudo apt-get -y install apache2 php libapache2-mod-php php-curl git rtorrent tmux ffmpeg
 
 echo download popcorn-web to public web folder
 sudo chmod 777 /var/www/html
