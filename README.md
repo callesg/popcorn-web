@@ -7,6 +7,43 @@ popcorn-web connects to the popcorntime API to list media, uses rtorrent to down
 
 ## Install
 
+
+```bash
+sudo apt-get install apache2 php libapache2-mod-php php-curl git rtorrent tmux ffmpeg
+
+chmod 777 /var/www/html
+cd /var/www/html
+
+git clone https://github.com/callesg/popcorn-web
+cd popcorn-web
+
+mkdir db
+chmod 777 db
+
+#make the converted video folder avalible on the web
+mkdir /tmp/videos
+ln -s /tmp/videos videos
+
+
+sudo mkdir /media/downloaded_folder /media/downloading_folder /media/torrent_folder
+sudo chmod 777 /media/downloaded_folder /media/downloading_folder /media/torrent_folder
+
+#make the downloaded_folder avalible on the web
+ln -s /media/downloaded_folder downloaded_folder
+
+#setup config.json
+cp -a config-example.json config.json
+
+#setup rtorrent config
+cp -a .rtorrent.rc ~/.rtorrent.rc
+sudo cp -a torrent_done.sh /opt/torrent_done.sh
+sudo chmod 555 /opt/torrent_done.sh
+
+#run rtorrent in tmux 
+tmux new-session rtorrent
+
+```
+
 ### Getting the code
 In your webfolder belonging to your php webserver 
 ```bash
