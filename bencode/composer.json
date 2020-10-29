@@ -1,0 +1,34 @@
+{
+    "name": "sandfoxme/bencode",
+    "description": "BitTorrent's Bencode encoder/decoder",
+    "keywords": ["bittorrent", "torrent", "bencode", "serialize"],
+    "homepage": "https://sandfox.dev/php/bencode.html",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Anton Smirnov",
+            "email": "sandfox@sandfox.me"
+        }
+    ],
+    "config": {
+        "sort-packages": true
+    },
+    "autoload": {
+        "psr-4": {
+            "SandFox\\Bencode\\": "src",
+            "SandFoxMe\\Bencode\\": "legacy"
+        }
+    },
+    "require": {
+        "php": "^7.0 | ^8.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": ">=6.0.0 <10",
+        "psy/psysh": "*",
+        "squizlabs/php_codesniffer": "*"
+    },
+    "suggest": {
+        "php-64bit": "Running 64 bit is recommended to prevent integer overflow"
+    }
+}
