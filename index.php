@@ -1,6 +1,131 @@
 <?php
+
 //include download library
 include("downloadCache.php");
+
+$config = json_decode(file_get_contents('config.json'), true);
+
+$downloaded_folder = $config['downloaded_folder'];
+$downloading_folder = $config['downloading_folder'];
+$external_link_to_done_folder = rawurlencode($config['public_link_downloaded_folder']);
+$torrent_folder = $config['torrent_folder'];
+
+//download magnet link, creates a torrent file in a folder that is then picked up by rtorrent
+if(isset($_GET['link'])){
+	$linkSheme = parse_url($_GET['link'], PHP_URL_SCHEME);
+	if($linkSheme === 'magnet'){
+		$query = parse_url($_GET['link'], PHP_URL_QUERY);
+		$parms = explode('&', $query);
+		$prms = array();
+		$infohash = 'notresolved';
+		foreach($parms AS $prm){
+			list($ky, $vl) = explode('=', $prm);
+			if($ky == 'dn'){
+				echo "torrent name: ".urldecode($vl)."<br>\n";
+			}
+			if($ky == 'xt'){
+				$infohash = strtoupper(substr($vl, 9));
+				if(strlen($infohash) == 32){
+					require_once("Base32.php");
+					$infohash = strtoupper(bin2hex(Base32\Base32::decode($infohash)));
+				}
+				echo "infohash: ".$infohash."<br>\n";
+			}
+		}
+		$hash_file = 'db/'.$infohash.'.hash';
+		if(file_exists($hash_file)){
+			$result_file = file_get_contents($hash_file);
+			if(file_exists($downloaded_folder.$result_file)){
+				$_GET['downloading'] = $result_file;
+			}
+		}
+		if(!isset($_GET['downloading'])){
+			$meta_file = $downloading_folder.'/'.$infohash.'.meta';
+			if(file_exists($meta_file)){
+				echo "Found metafile $infohash<br>\n";
+				try{
+
+					//We checkout the 1.x version of https://github.com/arokettu/bencode/tree/1.x
+					include("bencode/src/Bencode.php");
+					include("bencode/src/Engine/Decoder.php");
+					include("bencode/src/Util/Util.php");
+					include("bencode/src/Exceptions/BencodeException.php");
+					include("bencode/src/Exceptions/InvalidArgumentException.php");
+					include("bencode/src/Exceptions/ParseErrorException.php");
+					include("bencode/src/Exceptions/RuntimeException.php");
+					
+
+
+					$bencodeData = \SandFox\Bencode\Bencode::load($meta_file);
+					if(isset($bencodeData['name'])){
+						$_GET['downloading'] = $bencodeData['name'];
+						file_put_contents($hash_file, $_GET['downloading']);
+					}else{
+						echo "no name yet<br>\n<pre>";
+						//var_dump($bencodeData);
+						echo "</pre>";
+					}
+				}catch (Exception $e){
+					echo "Resolving info hash<br>\n";
+					echo "metafile under construction<br>\n";
+
+					echo "<pre>";
+					//var_dump($e);
+					echo "</pre>";
+				}
+			}else{
+				file_put_contents($torrent_folder.'meta-'.$infohash.'.torrent', make_rtorrent_meta_file($_GET['link']));
+			}
+			echo('<style>body{background-color:rgb(23,24,27);color:white;font-family: Arial;}</style>');
+			echo "initated loading of torrent<br>\n";
+		}
+	}
+	if(!isset($_GET['downloading'])){
+?>
+<script>
+	setTimeout(function(){
+		document.location.reload();
+	}, 5000)
+</script>
+have not resolved infohash yet
+<?php
+		exit;
+	}
+}
+if(isset($_GET['downloading'])){
+	echo('<style>body{background-color:rgb(23,24,27);color:white;font-family: Arial;}</style>');
+	if(file_exists($downloaded_folder.$_GET['downloading'])){
+
+		if(is_file($downloaded_folder.$_GET['downloading'])){
+			echo "file is done redirecting";
+			header('Location: live_stream.php?f='.$external_link_to_done_folder.rawurlencode($_GET['downloading']));
+		}else{
+			echo "torrent is a folder, find bigest file and redirect";
+			$files = array();
+			$downloaded_folder_len = strlen($downloaded_folder);
+			getDirContents($downloaded_folder.$_GET['downloading'], $files);
+			foreach ($files as $file) {
+				$sortedfiles[substr($file, $downloaded_folder_len)] = filemtime($file);
+			}
+			arsort($sortedfiles);
+			$sortedfiles = array_keys($sortedfiles);
+			header('Location: live_stream.php?f='.$external_link_to_done_folder.rawurlencode($sortedfiles[0]));
+		}
+	}else{
+?>
+	downloading...<br>
+	<?= $_GET['downloading'] ?><br>
+	redirecting when done
+
+<script>
+	setTimeout(function(){
+		document.location.search = '?downloading=<?= rawurlencode($_GET['downloading']) ?>';
+	}, 7000)
+</script>
+<?php
+	}
+	exit;
+}
 
 //Load information about the API
 $api_config = json_decode(file_get_contents('api-info.json'), true);
@@ -44,9 +169,16 @@ $imdb_id = NULL;
 if(isset($_GET['imdb_id'])){
 	$imdb_id = $_GET['imdb_id'];
 }
+$details = NULL;
+$extra = '';
+if(isset($imdb_id)){
+	$details = json_decode(GetPage($apiurl.substr($type_val, 0, -1).'/'.$imdb_id, false, false, 'json', false, true), true);
+	$extra = ' - '.$details['title'].' ('.$details['year'].')';
+}
 
 
 ?><html>
+	<title>popcorn-web: <?= ucfirst($type_val) ?><?= $extra ?></title>
 <style>
 body{
 	background-color:rgb(23,24,27);
@@ -70,9 +202,9 @@ max-width:70em;
 </style>
 <body>
 	<div>
-<?php foreach($api_config AS $k => $tp){ ?>
+<?php	foreach($api_config AS $k => $tp){ ?>
 		<a href="?type=<?= $k ?>"><?= $k ?></a>
-<?php } ?>
+<?php } ?>
 		<form method="get" class="filter">
 			<input type="hidden" name="type" value="<?= $type_val ?>">
 			<select name="genre" onchange="this.form.submit()">
@@ -93,8 +225,11 @@ max-width:70em;
 	</div>
 <?php
 
-if(isset($imdb_id)){
-	$details = json_decode(GetPage($apiurl.substr($type_val, 0, -1).'/'.$imdb_id, false, false, 'json', false, true), true);
+if(isset($details)){
+	$stat = "";
+	if(isset($details["status"])){
+		$stat = $details["status"]." • ";
+	}
 ?>
 <div class="row">
 	<div style="float:left;">
@@ -102,7 +237,7 @@ if(isset($imdb_id)){
 	</div>
 	<div style="float:left;margin:1em;">
 		<h2><?= $details["title"] ?></h2>
-		<h5><?= $details["year"] ?> • <?= $details["runtime"] ?> min • <?= $details["status"] ?> • <?= implode($details["genres"], ', ') ?> • <?= $details["rating"]["percentage"]/10 ?>/10</h5>
+		<h5><?= $details["year"] ?> • <?= $details["runtime"] ?> min • <?= $stat ?><?= implode($details["genres"], ', ') ?> • <?= $details["rating"]["percentage"]/10 ?>/10</h5>
 		<p class="synopsis"><?= $details["synopsis"] ?></p>
 	</div>
 </div>
@@ -130,12 +265,12 @@ if(isset($imdb_id)){
 <?php foreach($episode['torrents'] AS $tid => $tor){
 	if(is_string($tid)){
 ?>
-<a href="/torr/get.php?link=<?= urlencode($tor['url']) ?>"><?= $tid ?></a>
+<a href="?link=<?= urlencode($tor['url']) ?>"><?= $tid ?></a>
 <?php }
 } ?>
 </td>
 		</tr>
-<?php } ?>
+<?php } ?>
 		<table>
 	</div>
 <?php }
@@ -143,7 +278,7 @@ if(isset($imdb_id)){
 foreach($details['torrents']['en'] AS $tid => $tor){
 	if(is_string($tid)){
 ?>
-<a href="/torr/get.php?link=<?= urlencode($tor['url']) ?>"><?= $tid ?></a>
+<a href="?link=<?= urlencode($tor['url']) ?>"><?= $tid ?></a>
 <?php }
 }
 } ?>
@@ -168,16 +303,26 @@ foreach($details['torrents']['en'] AS $tid => $tor){
 		}
 		$movies = json_decode(GetPage($url, false, false, 'json', false, true), true);
 		foreach($movies AS $movie){
+
+			if(!isset($movie['torrents'])){
+				$movie['torrents'] = array('en' => array());
+			}
 ?>
 <div style="float:left;width:12em;height:24em;">
-	<!--<p><?= $movie["synopsis"] ?></p>-->
+<?php
+			if(!isset($movie['torrents'])){
+				echo("<pre>");
+				var_dump($movie);
+				echo("</pre>");
+			}
+?>
 	<a href="?type=<?= $type_val ?>&imdb_id=<?= $movie["imdb_id"] ?>">
 		<img height="190" src="<?= $movie["images"]["poster"] ?>">
 		<h4><?= $movie["title"] ?></h4>
 		<h6 style="color:rgb(70,70,70);"><?= $movie["year"] ?></h6>
 	</a>
 <?php foreach($movie['torrents']['en'] AS $res => $tor){ ?>
-	<p><a href="/torr/get.php?link=<?= urlencode($tor['url']) ?>"><?= $res ?></a></p>
+	<p><a href="?link=<?= urlencode($tor['url']) ?>"><?= $res ?></a></p>
 <?php } ?>
 </div>
 <?php

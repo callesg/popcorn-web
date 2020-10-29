@@ -87,3 +87,24 @@ function curl_go($url, $data = false, $refer = false, $headers = false, $RetHed 
 	}
 	return($res);
 }
+
+
+function make_rtorrent_meta_file($magnet_uri){
+	return 'd10:magnet-uri'.strlen($magnet_uri).':'.$magnet_uri.'e';
+}
+
+function getDirContents($dir, &$results = array()) {
+    $files = scandir($dir);
+
+    foreach ($files as $key => $value) {
+        $path = realpath($dir . DIRECTORY_SEPARATOR . $value);
+        if (!is_dir($path)) {
+            $results[] = $path;
+        } else if ($value != "." && $value != "..") {
+            getDirContents($path, $results);
+            $results[] = $path;
+        }
+    }
+
+    return $results;
+}
