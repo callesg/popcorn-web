@@ -54,20 +54,19 @@ setup __~/.rtorrent.rc__ rtorrent needs to monitor the /media/torrent_folder and
 * replace /media/downloading_folder with the folder for torrents that are currently downloading.
 * replace /media/torrent_folder with the folder where .torrents will be placed.
 ```
-system.method.set_key = event.download.finished,move_complete,"d.set_directory=/media/downloaded_folder/;execute=/opt/torrent_done.sh,$d.get_base_path="
+method.set_key = event.download.finished,move_complete,"d.set_directory=/media/downloaded_folder/;execute=/opt/torrent_done.sh,$d.get_base_path="
 
 directory = /media/downloading_folder
 
-schedule = watch_directory,5,5,load_start=/media/torrent_folder/*.torrent
+schedule = watch_directory,5,5,load.start=/media/torrent_folder/*.torrent
 
 ```
 
 create __/opt/torrent_done.sh__ a script that moves finished downloads to /media/downloaded_folder
 
 * replace -downloaded_folder- with the folder for finished downloads
-* replace -user- with the username the rtorrent is uning as
 ```bash
 #!/bin/bash
-chown -R -user-:www-data "$1"
+chown -R $USER:www-data "$1"
 mv -u "$1" "/media/downloaded_folder/"
 ```
