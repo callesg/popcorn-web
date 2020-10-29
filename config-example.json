@@ -1,6 +1,6 @@
 {
-"torrent_folder": "",
-"downloading_folder": "",
-"downloaded_folder": "",
-"public_link_downloaded_folder": ""
+"torrent_folder": "/media/torrent_folder/",
+"downloading_folder": "/media/downloading_folder",
+"downloaded_folder": "/media/downloaded_folder/",
+"public_link_downloaded_folder": "/popcorn-web/downloaded_folder/"
 }
