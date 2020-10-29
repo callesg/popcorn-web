@@ -8,8 +8,7 @@ popcorn-web connects to the popcorntime API to list media, uses rtorrent to down
 ## Install
 * If you already have rtorrent this might overwrite your old rtorrent config file.
 * If you want to use nginx just remove the apache specific parts
-* You can move the download folders just make sure you update config.json accordingly
-* There are options in live_stream.php for GPU acelerated video reencoding(reqires custom built ffmpeg)
+* You can move the download folders, just make sure you update config.json accordingly
 
 ```bash
 echo install depencies

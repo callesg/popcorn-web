@@ -4,6 +4,8 @@ if(!isset($_GET['f'])){
 	exit;
 }
 
+$TRY_CUDA = false;
+
 $public_link = rawurldecode($_GET['f']);
 if(strpos($public_link, '../') !== FALSE){
 	exit;//exit if there is shinanigans
@@ -18,6 +20,17 @@ if(!stat($full_path)){
 
 $ffprobe_dat = shell_exec('ffprobe '.escapeshellarg($full_path).' 2>&1');
 list($header, $info) = explode($full_path, $ffprobe_dat);
+
+$useNvenc = false;
+$useCuvid = false;
+if($TRY_CUDA){
+	if(strpos($header, 'cuvid') !== FALSE){
+		$useCuvid = true;
+	}
+	if(strpos($header, 'nvenc') !== FALSE){
+		$useNvenc = true;
+	}
+}
 
 $stream_data = array(
 	'ext' => $ext,
@@ -89,7 +102,7 @@ if($isMP4 && $isAAC && $isH264){
 }
 
 function start_ffmpeg($file, $reencode_audio, $reencode_video, $stream_data){
-
+	global $useNvenc, $useCuvid;
 	$filename = pathinfo($file, PATHINFO_FILENAME);
 	$outputfile = 'videos/'.$filename.'.m3u8';
 	$stream = '&';
@@ -101,7 +114,11 @@ function start_ffmpeg($file, $reencode_audio, $reencode_video, $stream_data){
 	$video_encode = '-c:v copy';
 	$extra_tag = '';
 	if($reencode_video){
-		$video_encode = '-c:v h264_nvenc -preset fast -pix_fmt yuv420p';
+		if($useNvenc){
+			$video_encode = '-c:v h264_nvenc -preset fast -pix_fmt yuv420p';
+		}else{
+			$video_encode = '-c:v libx264';
+		}
 	}else{
 		$tag = '';
 		if($stream_data['v_codec'] == 'h265'){
@@ -123,7 +140,9 @@ function start_ffmpeg($file, $reencode_audio, $reencode_video, $stream_data){
 	}
 	$input_decoder = '';
 	if($stream_data['v_codec'] == 'mpeg4'){
-		$input_decoder = '-c:v mpeg4_cuvid';
+		if($useCuvid){
+			$input_decoder = '-c:v mpeg4_cuvid';
+		}
 	}
 
 	if(file_exists('/tmp/'.$outputfile)){
