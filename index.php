@@ -1,5 +1,39 @@
 <?php
 
+function get_torrent_status($infohash){
+
+	$bytes_done = get_rtorrent_stat('d.get_bytes_done', $infohash);
+	$tot_size = get_rtorrent_stat('d.get_size_bytes', $infohash);
+
+	$ret = array(
+		'bytes_done' => $bytes_done,
+		'tot_size' => $tot_size,
+		'percent' =>  $bytes_done/$tot_size,
+		'tot_size_Mb' =>  intval($tot_size/(1024*1024))
+	);
+	return $ret;
+}
+
+//stat is either d.get_bytes_done OR d.get_size_bytes (we dont bother with parsing the xml just paste our params and go)
+//only works on methods that have the same number of character in their names.
+function get_rtorrent_stat($stat, $infohash){
+	$dat = str_replace(['XXXXXXXXXXXXXXXX','YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY'], [$stat,$infohash], file_get_contents('xmlrpc_method.hex'));
+	$sock = fsockopen('127.0.0.1', 9151);
+	if(!$sock){
+		return 0;
+	}
+	fwrite($sock, $dat);
+	$ret = '';
+	while (!feof($sock)) {
+        $ret .= fgets($sock, 128);
+    }
+    fclose($sock);
+	$parts = explode("\r\n\r\n", $ret);
+	$number = explode('i8>', $parts[1]);
+	$response_nr = intval($number[1]);
+	return $response_nr;
+}
+
 //include download library
 include("downloadCache.php");
 
@@ -10,6 +44,7 @@ $downloading_folder = $config['downloading_folder'];
 $external_link_to_done_folder = rawurlencode($config['public_link_downloaded_folder']);
 $torrent_folder = $config['torrent_folder'];
 
+$if_hash = NULL;
 //download magnet link, creates a torrent file in a folder that is then picked up by rtorrent
 if(isset($_GET['link'])){
 	$linkSheme = parse_url($_GET['link'], PHP_URL_SCHEME);
@@ -33,6 +68,7 @@ if(isset($_GET['link'])){
 			}
 		}
 		$hash_file = 'db/'.$infohash.'.hash';
+		$if_hash = $infohash;
 		if(file_exists($hash_file)){
 			$result_file = file_get_contents($hash_file);
 			if(file_exists($downloaded_folder.$result_file)){
@@ -92,6 +128,9 @@ have not resolved infohash yet
 		exit;
 	}
 }
+if(isset($_GET['infohash'])){
+	$if_hash = $_GET['infohash'];
+}
 if(isset($_GET['downloading'])){
 	echo('<style>body{background-color:rgb(23,24,27);color:white;font-family: Arial;}</style>');
 	if(file_exists($downloaded_folder.$_GET['downloading'])){
@@ -112,14 +151,20 @@ if(isset($_GET['downloading'])){
 			header('Location: live_stream.php?f='.$external_link_to_done_folder.rawurlencode($sortedfiles[0]));
 		}
 	}else{
+		$tor_dat = get_torrent_status($if_hash);
 ?>
 	downloading...<br>
 	<?= $_GET['downloading'] ?><br>
+	<div style="width:200px;height:20px;border:1px solid white;">
+		<div style="width:<?= 200*$tor_dat['percent'] ?>px;height:20px;background-color:green;">
+		</div>
+	</div>
+	<?=$tor_dat['tot_size_Mb']?> Mb<br>
 	redirecting when done
 
 <script>
 	setTimeout(function(){
-		document.location.search = '?downloading=<?= rawurlencode($_GET['downloading']) ?>';
+		document.location.search = '?downloading=<?= rawurlencode($_GET['downloading']) ?>&infohash=<?= $if_hash ?>';
 	}, 7000)
 </script>
 <?php
@@ -162,6 +207,12 @@ if(!isset($_GET['sort'])){
 $keywords = '';
 if(isset($_GET['keywords'])){
 	$keywords = $_GET['keywords'];
+	
+	//if the search starts with "magnet:" then we treat the search as a torrent url
+	if(substr($keywords,0, 7) == 'magnet:'){
+		header('Location: index.php?link='.urlencode($keywords));
+		exit;
+	}
 }
 
 //are we trying to view a particular piece of media
