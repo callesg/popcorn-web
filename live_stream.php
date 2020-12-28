@@ -105,6 +105,8 @@ function start_ffmpeg($file, $reencode_audio, $reencode_video, $stream_data){
 	global $useNvenc, $useCuvid;
 	$filename = pathinfo($file, PATHINFO_FILENAME);
 	$outputfile = 'videos/'.$filename.'.m3u8';
+	$outputfile = preg_replace('/\s/', '_', $outputfile);
+
 	$stream = '&';
 	$output = '-f segment -segment_list_flags cache -segment_list_size 0 -segment_time 60 -segment_list /tmp/'.$outputfile.' /tmp/videos/file%03d.ts';
 	$audio_encode = '-c:a copy';
