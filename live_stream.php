@@ -37,10 +37,6 @@ $stream_data = array(
 	'v_codec' => false,
 	'a_codec' => false,
 );
-$isMP4 = false;
-if($ext == 'mp4'){
-	$isMP4 = true;
-}
 if(strpos($info, 'h264') !== FALSE){
 	$stream_data['v_codec'] = 'h264';
 }elseif(strpos($info, 'h265') !== FALSE ||
@@ -60,38 +56,39 @@ if(strpos($info, 'aac') !== FALSE){
 //var_dump($info, $stream_data);
 //exit;
 
-$isAAC = false;
+$acceptable = array(
+	'video' => false,
+	'audio' => false,
+	'container' => false,
+);
+
+if($ext == 'mp4'){
+	$acceptable['container'] = true;
+}
+
 if($stream_data['a_codec']){
-	$isAAC = true;
+	$acceptable['audio'] = true;
 }
 
-$isH265 = false;
-if(in_array($stream_data['v_codec'], array('h265'))){
-	$isH265 = true;
-}
-$isH264 = false;
-if(in_array($stream_data['v_codec'], array('h264'))){
-	//we count h265 as ok in some circumatances 2020-05-11 why? i am removing this.
-	$isH264 = true;
+//Sometimes h265 is acceptable depends on how new the client device is
+if(in_array($stream_data['v_codec'], array('h264','h265'))){
+	$acceptable['video'] = true;
 }
 
 
-//echo $info;
-//var_dump($stream_data,$isMP4, $isAAC, $isH264);
-//exit;
-if($isMP4 && $isAAC && $isH264){
+
+if($acceptable['container'] && $acceptable['audio'] && $acceptable['video']){
 	header('Location: '.$public_link);
 	//echo "No need to convert anything\n";
 }else{
-	if(!$isAAC && !$isH264){
+	if(!$acceptable['audio'] && !$acceptable['video']){
 		//echo "Reencode audio and video\n";
 		start_ffmpeg($full_path, true, true, $stream_data);
 	}else{
-		if(!$isAAC){
+		if(!$acceptable['audio']){
 			//echo "Reencode the audio\n";
 			start_ffmpeg($full_path, true, false, $stream_data);
-		//}elseif(!$isH264 && !$isH265){//use this if we want to keep H265 streams They do sort of work on some apple devices
-		}elseif(!$isH264){
+		}elseif(!$acceptable['video']){
 			//echo "Reencode the video\n";
 			start_ffmpeg($full_path, false, true, $stream_data);
 		}else{
@@ -107,6 +104,7 @@ function start_ffmpeg($file, $reencode_audio, $reencode_video, $stream_data){
 	$outputfile = 'videos/'.$filename.'.m3u8';
 	$outputfile = preg_replace('/\s/', '_', $outputfile);
 
+	//Streaming mode is a mode where we try to convert the files as the client is digesting it(the stream ing is a bit iffy on the client side so give it a few minutes to buffer first)
 	$stream = '&';
 	$output = '-f segment -segment_list_flags cache -segment_list_size 0 -segment_time 60 -segment_list /tmp/'.$outputfile.' /tmp/videos/file%03d.ts';
 	$audio_encode = '-c:a copy';
@@ -119,7 +117,7 @@ function start_ffmpeg($file, $reencode_audio, $reencode_video, $stream_data){
 		if($useNvenc){
 			$video_encode = '-c:v h264_nvenc -preset fast -pix_fmt yuv420p';
 		}else{
-			$video_encode = '-c:v libx264';
+			$video_encode = '-c:v libx264 -pix_fmt yuv420p';//use yuv420p sometimes other pixelformats dont work so well
 		}
 	}else{
 		$tag = '';
