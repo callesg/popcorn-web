@@ -11,8 +11,8 @@ popcorn-web connects to the popcorntime API to list media, uses rtorrent to down
 * You can move the download folders, just make sure you update config.json accordingly
 
 ```bash
-echo install depencies
-sudo apt-get install apache2 php libapache2-mod-php php-curl git rtorrent tmux ffmpeg
+echo install dependencies
+sudo apt-get -y install apache2 php libapache2-mod-php php-curl git rtorrent tmux ffmpeg
 
 echo download popcorn-web to public web folder
 sudo chmod 777 /var/www/html
@@ -50,3 +50,10 @@ tmux new-session rtorrent
 
 ```
 
+## Theory of operation
+
+Web application writen in php loads data from the public popcorntime API. It formats the API data and shows it graphicly in the browser. It presents the user with buttons to view a certain listing. When the user presses the button a .torrent file is created from the API data. The file is saved to the __torrent_folder__ folder. That folder is beeing watched by rtorrent (a torrent downloading applicaion).
+
+When rtorrent sees that there is a new .torrent file in the folder it starts to download the file specified from the .torrent. Placing the downloading file in the __downloading_folder__ folder. When rtorrent is done it moves the finished file to the __downloaded_folder__ folder.
+
+When the web application detects that the finnished file is ready in the __downloaded_folder__ folder. The webapp sends the broswer to __live_stream.php__ which uses ffmpeg to convert the file to h264 if nececary and changes the media container if nececary to something that the browser can understand. Then the broswer is given a stream with the selected media.
