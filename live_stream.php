@@ -4,7 +4,7 @@ if(!isset($_GET['f'])){
 	exit;
 }
 
-$TRY_CUDA = false;
+$TRY_CUDA = true;
 
 $public_link = rawurldecode($_GET['f']);
 if(strpos($public_link, '../') !== FALSE){
@@ -32,10 +32,18 @@ if($TRY_CUDA){
 	}
 }
 
+//Extract bitrate and duration
+$info_parts = explode('Duration: ', $info);
+$lines = explode("\n", $info_parts[1]);
+$container_info_raw = explode(', ', $lines[0]);
+
+//Exctract codec
 $stream_data = array(
 	'ext' => $ext,
 	'v_codec' => false,
 	'a_codec' => false,
+	'duration' => strtotime('1970-01-01 '.$container_info_raw[0].' UTC'),//s
+	'bitrate' => preg_replace('/\D/', '', array_pop($container_info_raw))//kb/s
 );
 if(strpos($info, 'h264') !== FALSE){
 	$stream_data['v_codec'] = 'h264';
@@ -69,9 +77,14 @@ if($ext == 'mp4'){
 if($stream_data['a_codec']){
 	$acceptable['audio'] = true;
 }
+$client_decoders = array('h264');//everyone can decode h264
+
+if(true){//Not everyone can decode h265//fix add h265 detection
+	$client_decoders[] = 'h265';
+}
 
 //Sometimes h265 is acceptable depends on how new the client device is
-if(in_array($stream_data['v_codec'], array('h264','h265'))){
+if(in_array($stream_data['v_codec'], $client_decoders)){
 	$acceptable['video'] = true;
 }
 
@@ -114,10 +127,13 @@ function start_ffmpeg($file, $reencode_audio, $reencode_video, $stream_data){
 	$video_encode = '-c:v copy';
 	$extra_tag = '';
 	if($reencode_video){
+		//If we dont limit the nvenc encoder it tends to make the video files to large so we give it a bitrate
+		//FIX: we should use the bitrate of the video not the container
+		//FIX: even beter we should calculate bitrate based on resolution and client capability
 		if($useNvenc){
-			$video_encode = '-c:v h264_nvenc -preset fast -pix_fmt yuv420p';
+			$video_encode = '-c:v h264_nvenc -b:v '.(intval($stream_data['bitrate'])).'k -pix_fmt yuv420p';//The presets make almost no difference dont use them
 		}else{
-			$video_encode = '-c:v libx264 -pix_fmt yuv420p';//use yuv420p sometimes other pixelformats dont work so well
+			$video_encode = '-c:v libx264 -pix_fmt yuv420p';//use yuv420p sometimes other pixelformats dont work so well(especialy 10bit formats)
 		}
 	}else{
 		$tag = '';
@@ -139,9 +155,12 @@ function start_ffmpeg($file, $reencode_audio, $reencode_video, $stream_data){
 		$output = $tag.'/tmp/'.$outputfile;
 	}
 	$input_decoder = '';
-	if($stream_data['v_codec'] == 'mpeg4'){
-		if($useCuvid){
+	if($useCuvid){
+		if($stream_data['v_codec'] == 'mpeg4'){
 			$input_decoder = '-c:v mpeg4_cuvid';
+		}
+		if($stream_data['v_codec'] == 'h265'){
+			$input_decoder = '-c:v hevc_cuvid';
 		}
 	}
 
