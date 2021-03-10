@@ -14,10 +14,11 @@ function get_torrent_status($infohash){
 	return $ret;
 }
 
-//stat is either d.get_bytes_done OR d.get_size_bytes (we dont bother with parsing the xml just paste our params and go)
-//only works on methods that have the same number of character in their names.
-function get_rtorrent_stat($stat, $infohash){
-	$dat = str_replace(['XXXXXXXXXXXXXXXX','YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY'], [$stat,$infohash], file_get_contents('xmlrpc_method.hex'));
+//connect to rtorrent and ask for some data using it's XMLRPC system
+function get_rtorrent_dat($stat, $infohash){
+	$acutal_len = (222 - 56) + strlen($stat) + strlen($infohash);
+	$dat = str_replace(['222'], [''.$acutal_len], file_get_contents('xmlrpc_method.hex'));
+	$dat = str_replace(['XXXXXXXXXXXXXXXX','YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY'], [$stat,$infohash], $dat);
 	$sock = fsockopen('127.0.0.1', 9151);
 	if(!$sock){
 		return 0;
@@ -29,9 +30,31 @@ function get_rtorrent_stat($stat, $infohash){
     }
     fclose($sock);
 	$parts = explode("\r\n\r\n", $ret);
-	$number = explode('i8>', $parts[1]);
+	return $parts[1];
+}
+
+//stat is either d.get_bytes_done OR d.get_size_bytes (we dont bother with parsing the xml just paste our params and go)
+function get_rtorrent_stat($stat, $infohash){
+	$ret = get_rtorrent_dat($stat, $infohash);
+	$number = explode('i8>', $ret);
 	$response_nr = intval($number[1]);
 	return $response_nr;
+}
+
+if(isset($_GET['list_active'])){
+	$hashes =  get_rtorrent_dat('download_list', '');
+	$hparts = explode('<string>', $hashes);
+	echo('<style>body{background-color:rgb(23,24,27);color:white;font-family: Arial;}</style>');
+	echo "list torrents:\n";
+	array_shift($hparts);//shift away crap
+
+	foreach($hparts AS $hash){
+		$h2 = explode('</string>', $hash);
+		$hash = $h2[0];
+		echo "<p><a href=\"?infohash=".$hash."&link=magnet%3A%3Fxt%3Durn%3Abtih%3A".$hash."\">".$hash."</a></p>";
+		
+	}
+	exit;
 }
 
 //include download library
@@ -256,6 +279,8 @@ max-width:70em;
 <?php	foreach($api_config AS $k => $tp){ ?>
 		<a href="?type=<?= $k ?>"><?= $k ?></a>
 <?php } ?>
+		<a href="?list_active">list active</a>
+		<a href="speed_test.php">speed test</a>
 		<form method="get" class="filter">
 			<input type="hidden" name="type" value="<?= $type_val ?>">
 			<select name="genre" onchange="this.form.submit()">

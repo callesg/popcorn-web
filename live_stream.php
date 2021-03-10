@@ -1,7 +1,34 @@
 <?php
 
+$device = '';
+if(strpos($_SERVER['HTTP_USER_AGENT'], 'iPad') !== FALSE){
+	$device = 'iPad';
+}elseif(strpos($_SERVER['HTTP_USER_AGENT'], 'Macintosh;') !== FALSE){
+	$device = 'Mac';
+}elseif(strpos($_SERVER['HTTP_USER_AGENT'], 'iPhone;') !== FALSE){
+	$device = 'iPhone';
+}elseif(strpos($_SERVER['HTTP_USER_AGENT'], 'Windows') !== FALSE){
+	$device = 'Windows';
+}elseif(strpos($_SERVER['HTTP_USER_AGENT'], 'Linux; Android') !== FALSE){
+	$device = 'Android';
+}elseif(strpos($_SERVER['HTTP_USER_AGENT'], 'VLC') !== FALSE){
+	$device = 'VLC';
+}elseif(strpos($_SERVER['HTTP_USER_AGENT'], 'CrKey') !== FALSE){
+	$device = 'Chromecast';
+}
+
 if(!isset($_GET['f'])){
 	exit;
+}
+$force_hresolution = false;
+if(isset($_GET['hres'])){
+	$force_hresolution = intval($_GET['hres']);
+}
+
+$force_bitrate = false;
+if(isset($_GET['bitrate'])){
+	$force_bitrate = intval($_GET['bitrate']);
+	
 }
 
 $TRY_CUDA = true;
@@ -57,9 +84,24 @@ if(strpos($info, 'aac') !== FALSE){
 	$stream_data['a_codec'] = 'aac';
 }elseif(strpos($info, 'mp3') !== FALSE){
 	$stream_data['a_codec'] = 'mp3';
+}elseif(strpos($info, 'eac3') !== FALSE){
+	$stream_data['a_codec'] = 'eac3';
 }elseif(strpos($info, 'ac3') !== FALSE){
 	$stream_data['a_codec'] = 'ac3';
 }
+
+
+//We just want to watch this, down scale to something acceptable and compress with x264
+if(isset($_GET['min'])){
+	//with smaler bitrates  Nvenc does not do a very good job
+	$useNvenc = false;
+	
+	//A 480 stream leads to about 380kb/s with x264
+	$force_hresolution = 480;
+}
+
+$stream_data['force_bitrate'] = $force_bitrate;
+$stream_data['force_hresolution'] = $force_hresolution;
 
 //var_dump($info, $stream_data);
 //exit;
@@ -80,7 +122,7 @@ if($stream_data['a_codec']){
 $client_decoders = array('h264');//everyone can decode h264
 
 if(true){//Not everyone can decode h265//fix add h265 detection
-	$client_decoders[] = 'h265';
+	//$client_decoders[] = 'h265';
 }
 
 //Sometimes h265 is acceptable depends on how new the client device is
@@ -88,6 +130,17 @@ if(in_array($stream_data['v_codec'], $client_decoders)){
 	$acceptable['video'] = true;
 }
 
+//We have to reencode if we want to set a new bitrate
+if($force_bitrate || $force_hresolution){
+	$acceptable['video'] = false;
+}
+
+//Android cant play eac3 audio
+if($device == 'Android' && $stream_data['a_codec'] = 'eac3'){
+	$acceptable['audio'] = false;
+}
+//chromecast:
+//	$acceptable['video'] = false;
 
 
 if($acceptable['container'] && $acceptable['audio'] && $acceptable['video']){
@@ -123,17 +176,25 @@ function start_ffmpeg($file, $reencode_audio, $reencode_video, $stream_data){
 	$audio_encode = '-c:a copy';
 	if($reencode_audio){
 		$audio_encode = '-c:a libfdk_aac';
+		//chromecast has probelm with multichanel audio (but why should we ever rencode more than 2 chnnels...)
+		$audio_encode .= ' -ac 2';
+
 	}
 	$video_encode = '-c:v copy';
 	$extra_tag = '';
 	if($reencode_video){
-		//If we dont limit the nvenc encoder it tends to make the video files to large so we give it a bitrate
-		//FIX: we should use the bitrate of the video not the container
-		//FIX: even beter we should calculate bitrate based on resolution and client capability
+		$resize = '';
+		if($stream_data['force_hresolution']){
+			$resize = '-vf scale='.$stream_data['force_hresolution'].':-1 ';
+		}
+		$bt = '';
+		if($stream_data['force_bitrate']){
+			$bt = ' -b:v '.$stream_data['force_bitrate'].'k';
+		}
 		if($useNvenc){
-			$video_encode = '-c:v h264_nvenc -b:v '.(intval($stream_data['bitrate'])).'k -pix_fmt yuv420p';//The presets make almost no difference dont use them
+			$video_encode = $resize.'-c:v h264_nvenc'.$bt.' -pix_fmt yuv420p';//The presets make almost no difference dont use them
 		}else{
-			$video_encode = '-c:v libx264 -pix_fmt yuv420p';//use yuv420p sometimes other pixelformats dont work so well(especialy 10bit formats)
+			$video_encode = $resize.'-c:v libx264'.$bt.' -pix_fmt yuv420p';//use yuv420p sometimes other pixelformats dont work so well(especialy 10bit formats)
 		}
 	}else{
 		$tag = '';
@@ -145,6 +206,8 @@ function start_ffmpeg($file, $reencode_audio, $reencode_video, $stream_data){
 		}
 
 	}
+//chromecast
+//		$stream = '';
 
 	//If we are just changing the container we can wait until the entire procces is done it is so fast anyway
 	if(!$reencode_video && !$reencode_audio){
@@ -161,6 +224,9 @@ function start_ffmpeg($file, $reencode_audio, $reencode_video, $stream_data){
 		}
 		if($stream_data['v_codec'] == 'h265'){
 			$input_decoder = '-c:v hevc_cuvid';
+		}
+		if($stream_data['v_codec'] == 'h264'){
+			$input_decoder = '-c:v h264_cuvid';
 		}
 	}
 

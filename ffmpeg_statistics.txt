@@ -1,0 +1,51 @@
+When to use what type of video conversion:
+
+If there is more than 2300 kb/s of bandwith and data is free. use nvenc.
+If bandwith is not free like on cellphone use x264
+If the screen is small like on a cell phone use x264 and downscale to 480p
+
+Question should x264 ever be used to convert 720p? NAH Whenever we need to use x264 we can also skip HD
+
+Esentialy there are 3 modes:
+1. Just switch container.
+2. x264 downscale to 480p we just want to watch whatever we want to watch
+3. nvenc Just convert to a compatible format We have the bandwith to view in full format
+
+
+(480p)Source: width: 640 xvid: 1152 kb/s
+
+X264
+ca 600 kb/s
+Speed: Fast
+
+nvenc
+2100 kb/s
+Speed: Fastest
+
+
+
+
+(720p)Source: width: 1280 h265: 674 kb/s
+
+
+X264
+ca 1200 kb/s
+Speed: 1.66x
+
+
+Nvenc:
+2100 kb/s
+Speed: 12.9x
+
+
+
+(1080)Source: Width: 1920 h265: 1100 kb/s
+
+X264
+1250 kb/s
+Speed: 0.85x//to slow the conversion has to be over 1.0x
+
+
+Nvenc
+2400 kb/s
+speed: 5.77x
