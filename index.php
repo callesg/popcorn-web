@@ -42,8 +42,8 @@ function get_rtorrent_stat($stat, $infohash){
 }
 
 if(isset($_GET['list_active'])){
-	$hashes =  get_rtorrent_dat('download_list', '');
-	$hparts = explode('<string>', $hashes);
+	$hashesr =  get_rtorrent_dat('download_list', '');
+	$hparts = explode('<string>', $hashesr);
 	echo('<style>body{background-color:rgb(23,24,27);color:white;font-family: Arial;}</style>');
 	echo "list torrents:\n";
 	array_shift($hparts);//shift away crap
@@ -57,6 +57,32 @@ if(isset($_GET['list_active'])){
 	exit;
 }
 
+function get_hash_from_magnet($magnet, $verbose = true){
+	$query = parse_url($magnet, PHP_URL_QUERY);
+	$parms = explode('&', $query);
+	$prms = array();
+	$infohash = 'notresolved';
+	foreach($parms AS $prm){
+		list($ky, $vl) = explode('=', $prm);
+		if($ky == 'dn'){
+			if($verbose){
+				echo "torrent name: ".urldecode($vl)."<br>\n";
+			}
+		}
+		if($ky == 'xt'){
+			$infohash = strtoupper(substr($vl, 9));
+			if(strlen($infohash) == 32){
+				require_once("Base32.php");
+				$infohash = strtoupper(bin2hex(Base32\Base32::decode($infohash)));
+			}
+			if($verbose){
+				echo "infohash: ".$infohash."<br>\n";
+			}
+		}
+	}
+	return $infohash;
+}
+
 //include download library
 include("downloadCache.php");
 
@@ -67,37 +93,29 @@ $downloading_folder = $config['downloading_folder'];
 $external_link_to_done_folder = rawurlencode($config['public_link_downloaded_folder']);
 $torrent_folder = $config['torrent_folder'];
 
+$hashes = array();
+$hash_meta_file = 'db/meta_hash.json';
+if(!file_exists($hash_meta_file)){
+	file_put_contents($hash_meta_file, json_encode($hashes));
+}
+$hashes = json_decode(file_get_contents($hash_meta_file), true);
+
 $if_hash = NULL;
 //download magnet link, creates a torrent file in a folder that is then picked up by rtorrent
 if(isset($_GET['link'])){
 	$linkSheme = parse_url($_GET['link'], PHP_URL_SCHEME);
 	if($linkSheme === 'magnet'){
-		$query = parse_url($_GET['link'], PHP_URL_QUERY);
-		$parms = explode('&', $query);
-		$prms = array();
-		$infohash = 'notresolved';
-		foreach($parms AS $prm){
-			list($ky, $vl) = explode('=', $prm);
-			if($ky == 'dn'){
-				echo "torrent name: ".urldecode($vl)."<br>\n";
-			}
-			if($ky == 'xt'){
-				$infohash = strtoupper(substr($vl, 9));
-				if(strlen($infohash) == 32){
-					require_once("Base32.php");
-					$infohash = strtoupper(bin2hex(Base32\Base32::decode($infohash)));
-				}
-				echo "infohash: ".$infohash."<br>\n";
-			}
-		}
-		$hash_file = 'db/'.$infohash.'.hash';
+		
+		$infohash = get_hash_from_magnet($_GET['link']);
 		$if_hash = $infohash;
-		if(file_exists($hash_file)){
-			$result_file = file_get_contents($hash_file);
+			
+		if(isset($hashes[$if_hash])){
+			$result_file = $hashes[$if_hash];
 			if(file_exists($downloaded_folder.$result_file)){
 				$_GET['downloading'] = $result_file;
 			}
 		}
+
 		if(!isset($_GET['downloading'])){
 			$meta_file = $downloading_folder.'/'.$infohash.'.meta';
 			if(file_exists($meta_file)){
@@ -118,7 +136,8 @@ if(isset($_GET['link'])){
 					$bencodeData = \SandFox\Bencode\Bencode::load($meta_file);
 					if(isset($bencodeData['name'])){
 						$_GET['downloading'] = $bencodeData['name'];
-						file_put_contents($hash_file, $_GET['downloading']);
+						$hashes[$if_hash] = $_GET['downloading'];
+						file_put_contents($hash_meta_file, json_encode($hashes));
 					}else{
 						echo "no name yet<br>\n<pre>";
 						//var_dump($bencodeData);
@@ -347,9 +366,17 @@ if(isset($details)){
 			<td>
 <?php foreach($episode['torrents'] AS $tid => $tor){
 	if(is_string($tid)){
+		$hash = get_hash_from_magnet($tor['url'], false);
+		$title = "";
+		$check = "";
+		if(isset($hashes[$hash])){
+			$title = 'title="'.htmlentities($hashes[$hash]).'" ';
+			$check = "☑";
+		}
 ?>
-<a href="?link=<?= urlencode($tor['url']) ?>"><?= $tid ?></a>
-<?php }
+<a href="?link=<?= urlencode($tor['url']) ?>" <?= $title ?>><?= $tid ?><?= $check ?></a>
+<?php 
+	}
 } ?>
 </td>
 		</tr>
