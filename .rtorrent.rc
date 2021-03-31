@@ -6,5 +6,4 @@ schedule = watch_directory,5,5,load.start=/media/torrent_folder/*.torrent
 
 network.scgi.open_port = 127.0.0.1:9151
 
-
 session = /tmp/rtorrentsession
