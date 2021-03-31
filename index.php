@@ -210,6 +210,11 @@ if(!isset($_GET['type'])){
 }
 $type_val = $_GET['type'];
 
+$pagenr = 0;
+if(isset($_GET['pagenr'])){
+	$pagenr = intval($_GET['pagenr']);
+}
+
 //Only media types from the API config is allowed
 if(!isset($api_config[$type_val])){
 	echo "non valid type";
@@ -237,6 +242,8 @@ if(isset($_GET['keywords'])){
 		exit;
 	}
 }
+
+$adative_url = '?type='.$_GET['type'].'&genere='.$_GET['genre'].'&sort='.$_GET['sort'].'&keywords='.$_GET['keywords'];
 
 //are we trying to view a particular piece of media
 $imdb_id = NULL;
@@ -369,7 +376,10 @@ foreach($details['torrents']['en'] AS $tid => $tor){
 	$page = GetPage($apiurl.$type_val, false, false, 'json', false, true);
 	$filmpages = json_decode($page, true);
 	foreach($filmpages AS $id => $endpoint){
-		if($id > 2){
+		if($id < $pagenr){
+			continue;
+		}
+		if($id > $pagenr+2){
 			break;
 		}
 
@@ -405,6 +415,13 @@ foreach($details['torrents']['en'] AS $tid => $tor){
 
 		}
 	}
+?>
+<div style="float:left;width:12em;height:24em;">
+<p>
+<a href="<?= $adative_url.'&pagenr='.($pagenr+2) ?>">Load more entrys</a>
+</p>
+</div>
+<?php
 }
 ?>
 </body>
