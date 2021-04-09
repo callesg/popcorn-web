@@ -41,18 +41,34 @@ function get_rtorrent_stat($stat, $infohash){
 	return $response_nr;
 }
 
+$hashes = array();
+$hash_meta_file = 'db/meta_hash.json';
+if(!file_exists($hash_meta_file)){
+	file_put_contents($hash_meta_file, json_encode($hashes));
+}
+$hashes = json_decode(file_get_contents($hash_meta_file), true);
+
 if(isset($_GET['list_active'])){
 	$hashesr =  get_rtorrent_dat('download_list', '');
 	$hparts = explode('<string>', $hashesr);
 	echo('<style>body{background-color:rgb(23,24,27);color:white;font-family: Arial;}</style>');
-	echo "list torrents:\n";
+	echo "<h2>Currently active</h2>\n";
 	array_shift($hparts);//shift away crap
 
 	foreach($hparts AS $hash){
 		$h2 = explode('</string>', $hash);
 		$hash = $h2[0];
-		echo "<p><a href=\"?infohash=".$hash."&link=magnet%3A%3Fxt%3Durn%3Abtih%3A".$hash."\">".$hash."</a></p>";
+		$name = "";
+		if(isset($hashes[$hash])){
+			$name = $hashes[$hash];
+		}
+		echo "<p><a href=\"?infohash=".$hash."&link=magnet%3A%3Fxt%3Durn%3Abtih%3A".$hash."\">".$hash." (".$name.")</a></p>";
 		
+	}
+	echo "<h2>Recently accesed</h2>\n";
+	$hashes_reverse = array_reverse($hashes);
+	foreach($hashes_reverse AS $hash => $name){
+		echo "<p><a href=\"?infohash=".$hash."&link=magnet%3A%3Fxt%3Durn%3Abtih%3A".$hash."\">".$hash." (".$name.")</a></p>";
 	}
 	exit;
 }
@@ -93,12 +109,6 @@ $downloading_folder = $config['downloading_folder'];
 $external_link_to_done_folder = rawurlencode($config['public_link_downloaded_folder']);
 $torrent_folder = $config['torrent_folder'];
 
-$hashes = array();
-$hash_meta_file = 'db/meta_hash.json';
-if(!file_exists($hash_meta_file)){
-	file_put_contents($hash_meta_file, json_encode($hashes));
-}
-$hashes = json_decode(file_get_contents($hash_meta_file), true);
 
 $if_hash = NULL;
 //download magnet link, creates a torrent file in a folder that is then picked up by rtorrent
