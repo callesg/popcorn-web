@@ -73,7 +73,7 @@ if(isset($_GET['list_active'])){
 	exit;
 }
 
-function get_hash_from_magnet($magnet, $verbose = true){
+function get_hash_from_magnet($magnet, $verbose = true, $return_name = false){
 	$query = parse_url($magnet, PHP_URL_QUERY);
 	$parms = explode('&', $query);
 	$prms = array();
@@ -81,6 +81,9 @@ function get_hash_from_magnet($magnet, $verbose = true){
 	foreach($parms AS $prm){
 		list($ky, $vl) = explode('=', $prm);
 		if($ky == 'dn'){
+			if($return_name){
+				return(urldecode($vl));
+			}
 			if($verbose){
 				echo "torrent name: ".urldecode($vl)."<br>\n";
 			}
@@ -95,6 +98,9 @@ function get_hash_from_magnet($magnet, $verbose = true){
 				echo "infohash: ".$infohash."<br>\n";
 			}
 		}
+	}
+	if($return_name){
+		return false;
 	}
 	return $infohash;
 }
@@ -364,7 +370,16 @@ if(isset($details)){
 			$seasons[$episode['season']][] = $episode;
 		}
 		ksort($seasons);
-		foreach($seasons AS $season => $episodes){?>
+		foreach($seasons AS $season => $episodes){
+			$season_formats = array();
+			foreach($episodes AS $episode){
+				foreach($episode['torrents'] AS $tid => $tor){
+					$season_formats[$tid] = $tid;
+				}
+			}
+			ksort($season_formats, SORT_NATURAL);
+
+?>
 	<div>
 		<h5>Season <?= $season ?></h5>
 		<table>
@@ -374,19 +389,29 @@ if(isset($details)){
 			<td><?= $episode['title'] ?></td>
 			<td><?= date('Y-m-d', $episode['first_aired']) ?></td>
 			<td>
-<?php foreach($episode['torrents'] AS $tid => $tor){
-	if(is_string($tid)){
-		$hash = get_hash_from_magnet($tor['url'], false);
-		$title = "";
-		$check = "";
-		if(isset($hashes[$hash])){
-			$title = 'title="'.htmlentities($hashes[$hash]).'" ';
-			$check = "☑";
-		}
+<?php foreach($season_formats AS $format){
+?><td><?php
+//$episode['torrents'] AS $tid => $tor){
+	if(isset($episode['torrents'][$format])){
+		$tid = $format;
+		$tor = $episode['torrents'][$format];
+		if(is_string($tid)){
+			$hash = get_hash_from_magnet($tor['url'], false);
+			$name = get_hash_from_magnet($tor['url'], false, true);
+			$title = "";
+			$check = "";
+			if(isset($hashes[$hash])){
+				$title = 'title="'.htmlentities($hashes[$hash]).'" ';
+				$check = "☑";
+			}elseif($name){
+				$title = 'title="'.htmlentities($name).'" ';
+			}
 ?>
 <a href="?link=<?= urlencode($tor['url']) ?>" <?= $title ?>><?= $tid ?><?= $check ?></a>
 <?php 
 	}
+	}
+?></td><?php
 } ?>
 </td>
 		</tr>
